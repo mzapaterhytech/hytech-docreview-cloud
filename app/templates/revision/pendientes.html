@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Mis pendientes — Hytech DocReview{% endblock %}
+{% block content %}
+<h4 class="mb-3"><i class="bi bi-check2-square me-2"></i>Mis pendientes</h4>
+
+{% if not documentos %}
+  <div class="alert alert-success"><i class="bi bi-emoji-smile me-1"></i>No tenés documentos pendientes asignados. 🎉</div>
+{% else %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>Cliente</th>
+        <th>Proyecto</th>
+        <th>Código</th>
+        <th>Rev.</th>
+        <th>Título</th>
+        <th>Llegada</th>
+        <th>Devolución</th>
+        <th class="text-center">Revisado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doc in documentos %}
+      <tr id="fila-doc-{{ doc.id }}">
+        <td class="small">{{ doc.proyecto.cliente.nombre }}</td>
+        <td class="small">{{ doc.proyecto.nombre }}</td>
+        <td class="fw-mono small">{{ doc.codigo }}</td>
+        <td>{{ doc.revision }}</td>
+        <td>{{ doc.titulo }}</td>
+        <td class="small">{{ doc.fecha_llegada }}</td>
+        <td class="small">{{ doc.fecha_devolucion or '—' }}</td>
+        <td class="text-center">
+          <input type="checkbox" class="form-check-input chk-revisado" data-doc-id="{{ doc.id }}"
+                 {% if doc.fecha_revision %}checked{% endif %}>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.chk-revisado').forEach(chk => {
+  chk.addEventListener('change', async () => {
+    const docId = chk.dataset.docId;
+    chk.disabled = true;
+    try {
+      const res = await fetch(`/revision/documento/${docId}/marcar-revisado`, { method: 'POST' });
+      if (!res.ok) throw new Error('error');
+      const fila = document.getElementById(`fila-doc-${docId}`);
+      if (fila) fila.style.opacity = '0.5';
+    } catch (e) {
+      chk.checked = !chk.checked;
+      alert('No se pudo guardar. Probá de nuevo.');
+    } finally {
+      chk.disabled = false;
+    }
+  });
+});
+</script>
+{% endblock %}

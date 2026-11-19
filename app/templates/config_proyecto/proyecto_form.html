@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if proyecto else 'Nuevo' }} proyecto — Hytech DocReview{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('config.index') }}">Configuración</a></li>
+    <li class="breadcrumb-item active">{{ 'Editar' if proyecto else 'Nuevo' }} proyecto</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-9">
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <h5 class="mb-0">{{ 'Editar' if proyecto else 'Nuevo' }} proyecto</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" id="formProyecto">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          {# ── Clonar configuración (solo nuevo proyecto) ── #}
+          {% if not proyecto and todos_proyectos %}
+          <div class="alert alert-secondary d-flex align-items-center gap-3 mb-4">
+            <i class="bi bi-copy fs-5"></i>
+            <div class="flex-grow-1">
+              <div class="fw-semibold small mb-1">Copiar configuración de otro proyecto</div>
+              <div class="d-flex gap-2 align-items-center">
+                <select id="selClonar" class="form-select form-select-sm" style="max-width:300px">
+                  <option value="">— Seleccioná un proyecto —</option>
+                  {% for p in todos_proyectos %}
+                    <option value="{{ p.id }}">{{ p.codigo }} — {{ p.nombre }}</option>
+                  {% endfor %}
+                </select>
+                <button type="button" id="btnClonar" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-arrow-down-circle me-1"></i>Copiar
+                </button>
+              </div>
+              <div class="form-text">Copia reglas, tipos habilitados, ruta de servidor y template de correo. No copia nombre, código ni configuración de provisión.</div>
+            </div>
+          </div>
+          {% endif %}
+
+          {# ── Datos básicos ─────────────────────────────── #}
+          <h6 class="text-muted text-uppercase small mb-3">Datos básicos</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">Cliente</label>
+              <select name="cliente_id" class="form-select" required>
+                <option value="">— Seleccioná —</option>
+                {% for c in clientes %}
+                  <option value="{{ c.id }}"
+                    {% if proyecto and proyecto.cliente_id == c.id %}selected{% endif %}>
+                    {{ c.nombre }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">Nombre del proyecto</label>
+              <input type="text" name="nombre" class="form-control"
+                     value="{{ proyecto.nombre if proyecto else '' }}"
+                     placeholder="Ej: Planta Compresora Norte" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Código</label>
+              <input type="text" name="codigo" class="form-control font-monospace"
+                     value="{{ proyecto.codigo if proyecto else '' }}"
+                     placeholder="Ej: PCN-001" required>
+            </div>
+          </div>
+
+          {# ── Servidor ──────────────────────────────────── #}
+          <h6 class="text-muted text-uppercase small mb-3">Servidor</h6>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Ruta base en servidor</label>
+            <input type="text" name="ruta_servidor_base" class="form-control font-monospace"
+                   value="{{ proyecto.ruta_servidor_base if proyecto else '' }}"
+                   placeholder="T:\Trabajo Arg\Nombre Proyecto">
+            <div class="form-text">
+              Ejemplo: <code>T:\Trabajo Arg\Planta Compresora Norte</code>
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Estructura de carpetas en servidor</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="estructura_servidor" value="v1" id="estructuraV1"
+                     {{ 'checked' if not proyecto or (proyecto.estructura_servidor or 'v1') != 'v2' }}>
+              <label class="form-check-label" for="estructuraV1">
+                <strong>v1</strong> — Estructura actual: <code>base / disciplina / tipo</code>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="estructura_servidor" value="v2" id="estructuraV2"
+                     {{ 'checked' if proyecto and proyecto.estructura_servidor == 'v2' }}>
+              <label class="form-check-label" for="estructuraV2">
+                <strong>v2</strong> — Nueva estructura: <code>base / NN-NNN_OE / 06-CI / tipo</code>
+                <span class="text-muted small ms-1">(HYT26025 y proyectos nuevos)</span>
+              </label>
+            </div>
+            <div id="alcanceV2Config" class="mt-2 ms-4" style="display:{{ 'block' if proyecto and proyecto.estructura_servidor == 'v2' else 'none' }}">
+              <label class="form-label small fw-semibold mb-1">Número de alcance (OE)</label>
+              <input type="text" name="alcance_v2" class="form-control form-control-sm font-monospace"
+                     style="width:100px"
+                     value="{{ proyecto.alcance_v2 if proyecto and proyecto.alcance_v2 else '' }}"
+                     placeholder="501">
+              <div class="form-text">
+                Número de la carpeta de alcance OE en el servidor (ej. <code>501</code> para
+                <code>03-501_OE</code>). Necesario cuando hay varias carpetas de alcance OE con
+                distinto número.
+              </div>
+            </div>
+          </div>
+
+          {# ── Estructura del código ─────────────────────── #}
+          <h6 class="text-muted text-uppercase small mb-2">Estructura del código de documento</h6>
+          <p class="text-muted small mb-3">
+            Definí cómo está compuesto el código de un documento en este proyecto.
+            El sistema lo usará para extraer la provisión y el tipo de documento al importar PDFs.
+          </p>
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-auto">
+              <label class="form-label small fw-semibold">Separador</label>
+              <input type="text" id="separadorCodigo" class="form-control form-control-sm font-monospace"
+                     style="width:60px" maxlength="3" placeholder="-">
+            </div>
+            <div class="col">
+              <label class="form-label small fw-semibold">Código de ejemplo</label>
+              <input type="text" id="codigoEjemplo" class="form-control form-control-sm font-monospace"
+                     placeholder="Ej: 052-ABDC-00700-PL-B-0056">
+            </div>
+            <div class="col-auto">
+              <button type="button" id="btnAnalizarCodigo" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-search me-1"></i>Analizar
+              </button>
+            </div>
+          </div>
+          <div id="segmentosContainer" class="mb-1" style="display:none">
+            <table class="table table-sm table-bordered" id="tablaSegmentos">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:60px">Seg.</th>
+                  <th style="width:120px">Valor ejemplo</th>
+                  <th style="width:210px">Campo</th>
+                  <th>Mapeo (valor del código → nombre destino)</th>
+                </tr>
+              </thead>
+              <tbody id="tbodySegmentos"></tbody>
+            </table>
+          </div>
+          <div class="form-text mb-4" id="segmentosHelp" style="display:none">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>Provisión:</strong> el valor se mapea al nombre de provisión (carpeta en servidor). Sin mapeo se usa el valor tal cual.<br>
+            <strong>Tipo de documento:</strong> solo se asigna si el valor está en el mapeo; si no hay coincidencia queda vacío.
+          </div>
+          <input type="hidden" name="reglas_codigo" id="reglasCodigoJson" value="{}">
+
+          {# ── Template de correo ────────────────────────── #}
+          <h6 class="text-muted text-uppercase small mb-2">Template de correo (opcional)</h6>
+          <div class="mb-4">
+            <textarea name="template_correo" class="form-control font-monospace" rows="5"
+                      placeholder="Estimado/a {nombre},&#10;&#10;Le informamos que tiene los siguientes documentos asignados del proyecto {proyecto}...">{{ proyecto.template_correo if proyecto else '' }}</textarea>
+            <div class="form-text">
+              Variables disponibles: <code>{nombre}</code> <code>{proyecto}</code> <code>{provision}</code>
+            </div>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('config.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+            {% if proyecto %}
+            <button type="button" class="btn btn-outline-success" id="btnCrearCarpetas">
+              <i class="bi bi-folder-plus me-1"></i>Crear carpetas de provisión
+            </button>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Guardar proyecto</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if proyecto %}
+{# Modal crear carpetas de provisión #}
+<div class="modal fade" id="modalCrearCarpetas" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-folder-plus me-2"></i>Crear carpetas de provisión en servidor</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">
+          Se crearán las carpetas seleccionadas dentro de cada tipo de documento
+          que exista en el servidor. Las carpetas que ya existen se omiten.
+        </p>
+        <div id="listaCarpetas">
+          {% set provs = proyecto.provisiones_disponibles %}
+          {% if provs %}
+            {% for p in provs %}
+            <div class="form-check">
+              <input class="form-check-input chk-prov" type="checkbox"
+                     value="{{ p }}" id="chkProv_{{ loop.index }}" checked>
+              <label class="form-check-label font-monospace small" for="chkProv_{{ loop.index }}">
+                {{ p }}
+              </label>
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-warning small">Este proyecto no tiene provisiones configuradas.</p>
+          {% endif %}
+        </div>
+        <div id="resultadoCarpetas" class="mt-3 d-none">
+          <hr>
+          <div id="resultadoContenido"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+        {% if proyecto.provisiones_disponibles %}
+        <button type="button" class="btn btn-success btn-sm" id="btnConfirmarCarpetas">
+          <i class="bi bi-folder-plus me-1"></i>Crear carpetas seleccionadas
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Mostrar/ocultar config de alcance v2 ───────────────────
+document.querySelectorAll('input[name="estructura_servidor"]').forEach(r => {
+  r.addEventListener('change', () => {
+    document.getElementById('alcanceV2Config').style.display =
+      r.value === 'v2' ? 'block' : 'none';
+  });
+});
+
+// ── Datos iniciales desde el servidor ──────────────────────
+const reglasCodigoInicial = {{ (proyecto.reglas_codigo if proyecto else {}) | tojson }};
+const tiposDisponibles = {{ tipos_disponibles | tojson }};
+
+// ── Estructura del código — lógica de segmentos ────────────
+
+function buildFilaMapeo(clave, valor, esTipoDoc) {
+  const tr = document.createElement('tr');
+  const optsHtml = tiposDisponibles.map(t =>
+    `<option value="${t}" ${t === valor ? 'selected' : ''}>${t}</option>`
+  ).join('');
+  const valCell = esTipoDoc
+    ? `<select class="form-select form-select-sm seg-mapeo-val">
+         <option value="">— Seleccioná tipo —</option>
+         ${optsHtml}
+       </select>`
+    : `<input type="text" class="form-control form-control-sm seg-mapeo-val"
+              value="${valor}" placeholder="Nombre destino">`;
+  tr.innerHTML = `
+    <td><input type="text" class="form-control form-control-sm font-monospace seg-mapeo-key"
+               value="${clave}" placeholder="Valor del código" style="width:130px"></td>
+    <td class="px-2 align-middle text-muted small">→</td>
+    <td>${valCell}</td>
+    <td><button type="button" class="btn btn-outline-danger btn-sm btn-del-mapeo-seg">
+          <i class="bi bi-trash"></i></button></td>
+  `;
+  return tr;
+}
+
+function buildSegmentoRow(indice, valorEjemplo, campo, mapeo) {
+  const tr = document.createElement('tr');
+  tr.dataset.indice = indice;
+
+  const opcionesCampo = [
+    { v: 'ignorar',        l: 'Ignorar' },
+    { v: 'provision',      l: 'Provisión' },
+    { v: 'tipo_documento', l: 'Tipo de documento' },
+  ];
+  const optsHtml = opcionesCampo.map(o =>
+    `<option value="${o.v}" ${o.v === campo ? 'selected' : ''}>${o.l}</option>`
+  ).join('');
+
+  tr.innerHTML = `
+    <td class="text-center font-monospace align-middle">${indice}</td>
+    <td class="font-monospace text-center align-middle fw-semibold">${valorEjemplo}</td>
+    <td class="align-middle">
+      <select class="form-select form-select-sm seg-campo-sel">${optsHtml}</select>
+    </td>
+    <td>
+      <div class="seg-mapeo-area" style="${campo !== 'ignorar' ? '' : 'display:none'}">
+        <table class="table table-sm mb-1" style="width:auto">
+          <tbody class="seg-mapeo-body"></tbody>
+        </table>
+        <button type="button" class="btn btn-outline-secondary btn-sm btn-add-mapeo-seg">
+          <i class="bi bi-plus-sm me-1"></i>Agregar mapeo
+        </button>
+      </div>
+    </td>
+  `;
+
+  // Poblar mapeo existente
+  const tbodyMapeo = tr.querySelector('.seg-mapeo-body');
+  Object.entries(mapeo || {}).forEach(([k, v]) =>
+    tbodyMapeo.appendChild(buildFilaMapeo(k, v, campo === 'tipo_documento'))
+  );
+
+  // Toggle área de mapeo + unicidad de campo
+  tr.querySelector('.seg-campo-sel').addEventListener('change', function () {
+    tr.querySelector('.seg-mapeo-area').style.display = this.value !== 'ignorar' ? '' : 'none';
+    if (this.value !== 'ignorar') {
+      document.querySelectorAll('#tbodySegmentos > tr').forEach(otroTr => {
+        if (otroTr === tr) return;
+        const otroSel = otroTr.querySelector('.seg-campo-sel');
+        if (otroSel && otroSel.value === this.value) {
+          otroSel.value = 'ignorar';
+          otroTr.querySelector('.seg-mapeo-area').style.display = 'none';
+        }
+      });
+    }
+  });
+
+  // Agregar fila de mapeo
+  tr.querySelector('.btn-add-mapeo-seg').addEventListener('click', () => {
+    const esTipoDoc = tr.querySelector('.seg-campo-sel').value === 'tipo_documento';
+    tbodyMapeo.appendChild(buildFilaMapeo('', '', esTipoDoc));
+  });
+
+  return tr;
+}
+
+function renderizarSegmentos(separador, codigoEjemplo, segmentosConfig) {
+  const partes = codigoEjemplo ? codigoEjemplo.split(separador) : [];
+  const tbody = document.getElementById('tbodySegmentos');
+  tbody.innerHTML = '';
+
+  // Usar la cantidad de partes del ejemplo o de la config, la que sea mayor
+  const total = Math.max(partes.length, segmentosConfig.length);
+  for (let i = 0; i < total; i++) {
+    const valorEjemplo = partes[i] ?? '—';
+    const cfg = segmentosConfig.find(s => s.indice === i) || { campo: 'ignorar', mapeo: {} };
+    tbody.appendChild(buildSegmentoRow(i, valorEjemplo, cfg.campo, cfg.mapeo));
+  }
+
+  document.getElementById('segmentosContainer').style.display = total > 0 ? '' : 'none';
+  document.getElementById('segmentosHelp').style.display = total > 0 ? '' : 'none';
+}
+
+// Botón analizar
+document.getElementById('btnAnalizarCodigo').addEventListener('click', () => {
+  const sep = document.getElementById('separadorCodigo').value || '-';
+  const ejemplo = document.getElementById('codigoEjemplo').value.trim();
+  if (!ejemplo) return;
+  renderizarSegmentos(sep, ejemplo, []);
+});
+
+// Eliminar fila de mapeo (delegación)
+document.addEventListener('click', e => {
+  if (e.target.closest('.btn-del-mapeo-seg')) e.target.closest('tr').remove();
+});
+
+// Serializar reglas_codigo antes de submit
+document.getElementById('formProyecto').addEventListener('submit', () => {
+  const sep = document.getElementById('separadorCodigo').value || '-';
+  const ejemplo = document.getElementById('codigoEjemplo').value.trim();
+  const segmentos = [];
+
+  document.querySelectorAll('#tbodySegmentos > tr').forEach(tr => {
+    const indice = parseInt(tr.dataset.indice);
+    const campo = tr.querySelector('.seg-campo-sel').value;
+    const mapeo = {};
+    tr.querySelectorAll('.seg-mapeo-body tr').forEach(mr => {
+      const k = mr.querySelector('.seg-mapeo-key')?.value.trim();
+      const v = mr.querySelector('.seg-mapeo-val')?.value.trim();
+      if (k && v) mapeo[k] = v;
+    });
+    segmentos.push({ indice, campo, mapeo });
+  });
+
+  const reglas = segmentos.length
+    ? { separador: sep, codigo_ejemplo: ejemplo, segmentos }
+    : {};
+  document.getElementById('reglasCodigoJson').value = JSON.stringify(reglas);
+});
+
+// Pre-cargar configuración existente al editar
+if (reglasCodigoInicial.segmentos?.length) {
+  const sep = reglasCodigoInicial.separador || '-';
+  const ejemplo = reglasCodigoInicial.codigo_ejemplo || '';
+  document.getElementById('separadorCodigo').value = sep;
+  document.getElementById('codigoEjemplo').value = ejemplo;
+  renderizarSegmentos(sep, ejemplo, reglasCodigoInicial.segmentos);
+}
+
+// ── Clonar configuración ───────────────────────────────────
+document.getElementById('btnClonar')?.addEventListener('click', async () => {
+  const id = document.getElementById('selClonar').value;
+  if (!id) return;
+  const res = await fetch(`/config/proyecto/${id}/config-json`);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  // Estructura del código
+  if (data.reglas_codigo?.segmentos?.length) {
+    const sep = data.reglas_codigo.separador || '-';
+    const ejemplo = data.reglas_codigo.codigo_ejemplo || '';
+    document.getElementById('separadorCodigo').value = sep;
+    document.getElementById('codigoEjemplo').value = ejemplo;
+    renderizarSegmentos(sep, ejemplo, data.reglas_codigo.segmentos);
+  }
+
+  // Ruta servidor y template correo
+  document.querySelector('input[name="ruta_servidor_base"]').value = data.ruta_servidor_base || '';
+  document.querySelector('textarea[name="template_correo"]').value = data.template_correo || '';
+});
+
+// ── Crear carpetas de provisión ──────────────────────────────
+document.getElementById('btnCrearCarpetas')?.addEventListener('click', () => {
+  document.getElementById('resultadoCarpetas').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('modalCrearCarpetas')).show();
+});
+
+{% if proyecto %}
+document.getElementById('btnConfirmarCarpetas')?.addEventListener('click', async () => {
+  const provisiones = [...document.querySelectorAll('.chk-prov:checked')].map(c => c.value);
+  if (!provisiones.length) return;
+
+  const btn = document.getElementById('btnConfirmarCarpetas');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creando…';
+
+  const res = await fetch('{{ url_for("config.crear_carpetas_provision", proyecto_id=proyecto.id) }}', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provisiones }),
+  });
+  const data = await res.json();
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="bi bi-folder-plus me-1"></i>Crear carpetas seleccionadas';
+
+  const div = document.getElementById('resultadoContenido');
+  if (data.error) {
+    div.innerHTML = `<div class="alert alert-danger small">${data.error}</div>`;
+  } else {
+    let html = '';
+    if (data.creadas.length)
+      html += `<p class="text-success small mb-1"><strong>${data.creadas.length} carpeta(s) creada(s):</strong></p>
+               <ul class="small mb-2">${data.creadas.map(c => `<li class="font-monospace">${c}</li>`).join('')}</ul>`;
+    if (data.existentes.length)
+      html += `<p class="text-muted small mb-1"><strong>${data.existentes.length} ya existían (omitidas)</strong></p>`;
+    if (data.errores.length)
+      html += `<p class="text-danger small mb-1"><strong>Errores:</strong></p>
+               <ul class="small">${data.errores.map(e => `<li>${e}</li>`).join('')}</ul>`;
+    if (!html) html = '<p class="text-muted small">No se encontraron carpetas de tipo de documento en el servidor para las disciplinas configuradas.</p>';
+    div.innerHTML = html;
+  }
+  document.getElementById('resultadoCarpetas').classList.remove('d-none');
+});
+{% endif %}
+</script>
+{% endblock %}

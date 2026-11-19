@@ -1,0 +1,60 @@
+/* ── Fuentes ─────────────────────────────────────────── */
+body {
+  font-size: 0.9rem;
+}
+
+.font-monospace {
+  font-family: 'Consolas', 'Courier New', monospace !important;
+}
+
+/* ── Navbar ──────────────────────────────────────────── */
+.navbar-brand {
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Tablas ──────────────────────────────────────────── */
+.table th {
+  white-space: nowrap;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.table td {
+  vertical-align: middle;
+}
+
+/* ── Preview thumbnail ───────────────────────────────── */
+.preview-thumb {
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  transition: opacity 0.15s;
+}
+
+.preview-thumb:hover {
+  opacity: 0.85;
+}
+
+/* ── Cards ───────────────────────────────────────────── */
+.card-header {
+  font-size: 0.9rem;
+}
+
+/* ── Formularios ─────────────────────────────────────── */
+.form-control-sm,
+.form-select-sm {
+  font-size: 0.82rem;
+}
+
+/* ── Sticky table header ─────────────────────────────── */
+.sticky-top {
+  top: 56px; /* altura de la navbar */
+  z-index: 10;
+}
+
+/* ── Texto vencido ───────────────────────────────────── */
+.text-vencido {
+  color: #dc3545;
+  font-weight: 600;
+}

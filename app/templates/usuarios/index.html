@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Usuarios — Hytech DocReview{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-people me-2"></i>Usuarios</h2>
+  <a href="{{ url_for('usuarios.nuevo') }}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Nuevo usuario
+  </a>
+</div>
+
+{% if not usuarios %}
+  <div class="alert alert-info">No hay usuarios todavía.</div>
+{% else %}
+<div class="card shadow-sm">
+  <table class="table table-sm table-hover mb-0 align-middle">
+    <thead class="table-light">
+      <tr>
+        <th style="width:90px">Iniciales</th>
+        <th>Nombre</th>
+        <th>Email</th>
+        <th style="width:110px">Rol</th>
+        <th style="width:90px">Activo</th>
+        <th style="width:80px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td class="font-monospace">{{ u.iniciales }}</td>
+        <td>{{ u.nombre }}</td>
+        <td class="small">{{ u.email }}</td>
+        <td>
+          <span class="badge {{ 'bg-primary' if u.es_admin else 'bg-secondary' }}">
+            {{ 'Admin' if u.es_admin else 'Revisor' }}
+          </span>
+        </td>
+        <td>
+          {% if u.activo %}
+            <span class="badge bg-success">Sí</span>
+          {% else %}
+            <span class="badge bg-secondary">No</span>
+          {% endif %}
+        </td>
+        <td class="text-end">
+          <a href="{{ url_for('usuarios.editar', usuario_id=u.id) }}"
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-pencil me-1"></i>Editar
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

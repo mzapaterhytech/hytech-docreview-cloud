@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Importar documentos — Hytech DocReview{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">Importar documentos</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-folder-plus me-2"></i>Importar documentos</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('importacion.scan') }}" id="formScan">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-4">
+            <label for="carpeta" class="form-label fw-semibold">Carpeta principal</label>
+            <div class="input-group">
+              <input type="text" name="carpeta" id="carpeta" class="form-control font-monospace"
+                     placeholder="C:\Users\..." required>
+              <button type="button" class="btn btn-outline-secondary" id="btnExplorar">
+                <i class="bi bi-folder2-open me-1"></i>Explorar…
+              </button>
+            </div>
+            <div class="form-text">
+              Seleccioná la carpeta que contiene subcarpetas por proyecto.
+              Cada subcarpeta debe llamarse exactamente como el <strong>código</strong> o
+              <strong>nombre</strong> del proyecto configurado.
+              <br>Ejemplo: <code>C:\Recepciones\PPT25014\</code>, <code>C:\Recepciones\PCN-001\</code>
+            </div>
+          </div>
+
+          <div class="d-grid">
+            <button type="submit" class="btn btn-primary btn-lg" id="btnScan">
+              <i class="bi bi-search me-2"></i>Escanear carpetas
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btnExplorar')?.addEventListener('click', async () => {
+  try {
+    const res = await fetch('{{ url_for("importacion.folder_picker") }}');
+    const data = await res.json();
+    if (data.folder) {
+      document.getElementById('carpeta').value = data.folder;
+    }
+  } catch (e) {
+    alert('No se pudo abrir el selector de carpetas. Ingresá la ruta manualmente.');
+  }
+});
+
+document.getElementById('formScan')?.addEventListener('submit', () => {
+  const btn = document.getElementById('btnScan');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Escaneando…';
+});
+</script>
+{% endblock %}

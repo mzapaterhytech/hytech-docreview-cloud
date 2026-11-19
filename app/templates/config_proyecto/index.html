@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Configuración — Hytech DocReview{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0"><i class="bi bi-gear me-2"></i>Configuración</h2>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('config.cliente_nuevo') }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Nuevo cliente
+    </a>
+    <a href="{{ url_for('config.proyecto_nuevo') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i>Nuevo proyecto
+    </a>
+  </div>
+</div>
+
+{% if not clientes %}
+  <div class="alert alert-info">
+    No hay clientes todavía. <a href="{{ url_for('config.cliente_nuevo') }}">Crear el primero</a>.
+  </div>
+{% endif %}
+
+{% for cliente in clientes %}
+<div class="card mb-3 shadow-sm">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">
+      <i class="bi bi-building me-2 text-primary"></i>{{ cliente.nombre }}
+    </h6>
+    <a href="{{ url_for('config.cliente_editar', cliente_id=cliente.id) }}"
+       class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-pencil me-1"></i>Editar cliente
+    </a>
+  </div>
+  <div class="card-body p-0">
+    {% if cliente.proyectos %}
+    <table class="table table-sm table-hover mb-0" style="table-layout:fixed;">
+      <colgroup>
+        <col style="width:14%">
+        <col>
+        <col style="width:16%">
+        <col style="width:10%">
+      </colgroup>
+      <thead class="table-light">
+        <tr>
+          <th>Código</th>
+          <th>Nombre</th>
+          <th>Provisión única</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in cliente.proyectos %}
+        <tr>
+          <td class="font-monospace small">{{ p.codigo }}</td>
+          <td>{{ p.nombre }}</td>
+          <td>{{ 'Sí' if p.provision_unica else 'No' }}</td>
+          <td class="text-end">
+            <a href="{{ url_for('config.proyecto_editar', proyecto_id=p.id) }}"
+               class="btn btn-outline-primary btn-sm me-1">
+              <i class="bi bi-pencil me-1"></i>Editar
+            </a>
+            <button type="button" class="btn btn-outline-danger btn-sm"
+                    onclick="confirmarEliminar({{ p.id }}, '{{ p.nombre|e }}', {{ p.documentos|length }})">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="text-muted p-3 mb-0 small">Sin proyectos.
+        <a href="{{ url_for('config.proyecto_nuevo') }}">Agregar uno</a>.
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<!-- Modal confirmación eliminar proyecto -->
+<div class="modal fade" id="modalEliminar" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title text-danger"><i class="bi bi-trash me-2"></i>Eliminar proyecto</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Estás seguro de que querés eliminar <strong id="modalNombreProyecto"></strong>?</p>
+        <p id="modalAdvertenciaDocumentos" class="text-danger small mb-0" style="display:none">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Este proyecto tiene <strong id="modalCantDocumentos"></strong> documento(s) registrados que también se eliminarán de la base de datos.
+        </p>
+        <p class="text-muted small mt-2 mb-0">Esta acción no se puede deshacer. No se eliminan archivos del servidor.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <form id="formEliminar" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-danger btn-sm">Eliminar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function confirmarEliminar(id, nombre, cantDocumentos) {
+  document.getElementById('modalNombreProyecto').textContent = nombre;
+  const advEl = document.getElementById('modalAdvertenciaDocumentos');
+  if (cantDocumentos > 0) {
+    document.getElementById('modalCantDocumentos').textContent = cantDocumentos;
+    advEl.style.display = '';
+  } else {
+    advEl.style.display = 'none';
+  }
+  document.getElementById('formEliminar').action = `/config/proyecto/${id}/eliminar`;
+  new bootstrap.Modal(document.getElementById('modalEliminar')).show();
+}
+</script>
+{% endblock %}

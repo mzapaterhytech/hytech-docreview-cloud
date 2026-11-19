@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Editar' if usuario else 'Nuevo' }} usuario — Hytech DocReview{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('usuarios.index') }}">Usuarios</a></li>
+    <li class="breadcrumb-item active">{{ 'Editar' if usuario else 'Nuevo' }} usuario</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-header">
+        <h5 class="mb-0">{{ 'Editar' if usuario else 'Nuevo' }} usuario</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Nombre completo</label>
+              <input type="text" name="nombre" class="form-control"
+                     value="{{ usuario.nombre if usuario else '' }}"
+                     placeholder="Ej: Miguel Zapater" required autofocus>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Iniciales</label>
+              <input type="text" name="iniciales" class="form-control font-monospace"
+                     value="{{ usuario.iniciales if usuario else '' }}"
+                     maxlength="10" placeholder="MZ" required>
+              <div class="form-text">Únicas en todo el dashboard.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Rol</label>
+              <select name="rol" class="form-select">
+                {% for r in roles %}
+                  <option value="{{ r }}" {% if usuario and usuario.rol == r %}selected{% endif %}>
+                    {{ 'Admin' if r == 'admin' else 'Revisor' }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Email</label>
+            <input type="email" name="email" class="form-control"
+                   value="{{ usuario.email if usuario else '' }}"
+                   placeholder="nombre@hytech.com" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">
+              {{ 'Nueva contraseña' if usuario else 'Contraseña' }}
+            </label>
+            <input type="password" name="password" class="form-control"
+                   {% if not usuario %}required{% endif %}>
+            {% if usuario %}
+              <div class="form-text">Dejar vacío para no cambiarla.</div>
+            {% endif %}
+          </div>
+
+          <div class="form-check mb-4">
+            <input class="form-check-input" type="checkbox" name="activo" id="chkActivo"
+                   {% if not usuario or usuario.activo %}checked{% endif %}>
+            <label class="form-check-label" for="chkActivo">Activo (puede iniciar sesión)</label>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-end">
+            <a href="{{ url_for('usuarios.index') }}" class="btn btn-outline-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

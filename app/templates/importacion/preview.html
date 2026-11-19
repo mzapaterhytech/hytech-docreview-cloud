@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Previsualización — Hytech DocReview{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('importacion.index') }}">Importar</a></li>
+    <li class="breadcrumb-item active">Previsualización</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">
+    <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>Previsualización
+  </h4>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelAll">
+      <i class="bi bi-check2-all me-1"></i>Seleccionar todos
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnDeselAll">
+      <i class="bi bi-x-lg me-1"></i>Deseleccionar todos
+    </button>
+  </div>
+</div>
+
+{# Advertencias de subcarpetas sin proyecto #}
+{% if sin_proyecto %}
+<div class="alert alert-warning">
+  <i class="bi bi-exclamation-triangle me-2"></i>
+  <strong>Sin proyecto configurado:</strong>
+  Las siguientes subcarpetas no coinciden con ningún proyecto y fueron ignoradas:
+  {% for nombre in sin_proyecto %}
+    <span class="badge bg-secondary ms-1">{{ nombre }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('importacion.confirmar') }}" id="formConfirmar">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="total_grupos" value="{{ grupos | length }}">
+
+  {% for g, grupo in enumerate(grupos) %}
+  {% set proyecto = grupo.proyecto %}
+  <input type="hidden" name="proyecto_id_{{ g }}" value="{{ proyecto.id }}">
+  <input type="hidden" name="total_{{ g }}" value="{{ grupo.docs | length }}">
+
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <div>
+        <span class="fw-bold font-monospace fs-5">{{ proyecto.codigo }}</span>
+        <span class="text-muted ms-2 small">{{ proyecto.nombre }}</span>
+      </div>
+      <span class="badge bg-secondary">{{ grupo.docs | length }} PDF(s)</span>
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm align-middle mb-0" id="tablaPreview_{{ g }}">
+          <thead class="table-dark" style="position:sticky; top:0; z-index:2;">
+            <tr>
+              <th style="width:40px">
+                <input type="checkbox" class="chk-all-grupo" data-grupo="{{ g }}" checked
+                       title="Seleccionar/deseleccionar este proyecto">
+              </th>
+              <th style="width:160px">Rótulo</th>
+              <th>Archivo</th>
+              <th>Código</th>
+              <th style="width:70px">Rev.</th>
+              {% if not proyecto.provision_unica %}
+              <th style="width:90px">Provisión</th>
+              {% endif %}
+              <th>Título</th>
+              <th style="width:140px">Disciplina</th>
+              <th style="width:180px">Tipo de documento</th>
+              <th style="width:110px">Asignado a</th>
+              <th style="width:110px">Llegada</th>
+              <th style="width:110px">Devolución</th>
+              <th>Comentarios</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i, doc in enumerate(grupo.docs) %}
+            <tr>
+              <td class="text-center">
+                <input type="checkbox" name="incluir_{{ g }}_{{ i }}" value="1"
+                       checked class="chk-incluir">
+              </td>
+
+              {# Preview imagen / captura #}
+              <td class="p-1">
+                {% if doc.preview_file %}
+                  <img src="{{ url_for('importacion.preview_img', filename=doc.preview_file) }}"
+                       class="preview-thumb"
+                       alt="Rótulo"
+                       data-bs-toggle="modal"
+                       data-bs-target="#modalPreview"
+                       data-src="{{ url_for('importacion.preview_img', filename=doc.preview_file) }}"
+                       style="cursor:zoom-in; max-width:150px; max-height:100px; object-fit:contain;">
+                {% else %}
+                  <span class="text-muted small"><i class="bi bi-image"></i> N/D</span>
+                {% endif %}
+              </td>
+
+              {# Nombre archivo (read-only) #}
+              <td class="small font-monospace text-muted">
+                {{ doc.filename }}
+                <input type="hidden" name="archivo_original_{{ g }}_{{ i }}" value="{{ doc.archivo_original }}">
+              </td>
+
+              {# Código #}
+              <td>
+                <input type="text" name="codigo_{{ g }}_{{ i }}" value="{{ doc.codigo }}"
+                       class="form-control form-control-sm font-monospace" required>
+              </td>
+
+              {# Revisión #}
+              <td>
+                <input type="text" name="revision_{{ g }}_{{ i }}" value="{{ doc.revision }}"
+                       class="form-control form-control-sm">
+              </td>
+
+              {% if not proyecto.provision_unica %}
+              {# Provisión #}
+              <td>
+                {% set provs = proyecto.provisiones_disponibles %}
+                {% if provs %}
+                  <select name="provision_{{ g }}_{{ i }}" class="form-select form-select-sm">
+                    <option value="">—</option>
+                    {% for p in provs %}
+                      <option value="{{ p }}" {% if p == doc.provision %}selected{% endif %}>{{ p }}</option>
+                    {% endfor %}
+                  </select>
+                {% else %}
+                  <input type="text" name="provision_{{ g }}_{{ i }}" value="{{ doc.provision }}"
+                         class="form-control form-control-sm">
+                {% endif %}
+              </td>
+              {% endif %}
+
+              {# Título (auto-extraído si hay texto) #}
+              <td>
+                <input type="text" name="titulo_{{ g }}_{{ i }}" value="{{ doc.titulo }}"
+                       class="form-control form-control-sm"
+                       placeholder="Ver rótulo →">
+              </td>
+
+              {# Disciplina #}
+              <td>
+                <select name="disciplina_{{ g }}_{{ i }}" class="form-select form-select-sm">
+                  <option value="">—</option>
+                  {% for d in disciplinas %}
+                    <option value="{{ d }}" {% if d == 'Civil' %}selected{% endif %}>{{ d }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+
+              {# Tipo de documento #}
+              <td>
+                <select name="tipo_documento_{{ g }}_{{ i }}" class="form-select form-select-sm">
+                  <option value="">—</option>
+                  {% for t in grupo.tipos %}
+                    <option value="{{ t }}" {% if t == doc.tipo_documento %}selected{% endif %}>
+                      {{ t }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+
+              {# Asignado a #}
+              <td>
+                <select name="asignado_a_{{ g }}_{{ i }}" class="form-select form-select-sm">
+                  <option value="">—</option>
+                  {% for u in usuarios %}
+                    <option value="{{ u.iniciales }}">{{ u.iniciales }} — {{ u.nombre }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+
+              {# Fecha llegada (editable) #}
+              <td>
+                <input type="date" name="fecha_llegada_{{ g }}_{{ i }}"
+                       value="{{ doc.fecha_llegada }}"
+                       class="form-control form-control-sm">
+              </td>
+
+              {# Fecha devolución #}
+              <td>
+                <input type="date" name="fecha_devolucion_{{ g }}_{{ i }}"
+                       value="{{ doc.fecha_devolucion }}"
+                       class="form-control form-control-sm">
+              </td>
+
+              {# Comentarios #}
+              <td>
+                <input type="text" name="comentarios_{{ g }}_{{ i }}" value=""
+                       class="form-control form-control-sm">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="d-flex justify-content-end gap-3 mt-3 pb-4">
+    <a href="{{ url_for('importacion.index') }}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Volver
+    </a>
+    <button type="submit" class="btn btn-success btn-lg" id="btnConfirmar">
+      <i class="bi bi-check-lg me-2"></i>Confirmar importación
+    </button>
+  </div>
+</form>
+
+{# Modal para ampliar imagen con zoom #}
+<div class="modal fade" id="modalPreview" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title">Rótulo del plano</h6>
+        <div class="d-flex gap-2 align-items-center me-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomOut" title="Alejar">
+            <i class="bi bi-zoom-out"></i>
+          </button>
+          <span id="zoomLabel" class="small text-muted" style="min-width:40px;text-align:center">100%</span>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomIn" title="Acercar">
+            <i class="bi bi-zoom-in"></i>
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnZoomReset" title="Restablecer">
+            <i class="bi bi-aspect-ratio"></i>
+          </button>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0 overflow-hidden" id="zoomContainer"
+           style="cursor:grab; height:70vh; display:flex; align-items:center; justify-content:center; background:#222;">
+        <img id="modalImg" src="" alt="Rótulo ampliado"
+             style="transform-origin:center center; max-width:100%; max-height:100%; user-select:none;">
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Modal de rótulo con zoom y arrastre ─────────────────────
+const modalImg = document.getElementById('modalImg');
+const zoomContainer = document.getElementById('zoomContainer');
+const zoomLabel = document.getElementById('zoomLabel');
+let scale = 1, tx = 0, ty = 0;
+let dragging = false, startX = 0, startY = 0;
+
+function applyTransform() {
+  modalImg.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  zoomLabel.textContent = Math.round(scale * 100) + '%';
+}
+
+function resetZoom() {
+  scale = 1; tx = 0; ty = 0;
+  applyTransform();
+}
+
+// Abrir modal y resetear zoom
+document.querySelectorAll('.preview-thumb').forEach(img => {
+  img.addEventListener('click', () => {
+    modalImg.src = img.dataset.src;
+    resetZoom();
+  });
+});
+
+// Botones de zoom
+document.getElementById('btnZoomIn').addEventListener('click', () => {
+  scale = Math.min(scale * 1.3, 6);
+  applyTransform();
+});
+document.getElementById('btnZoomOut').addEventListener('click', () => {
+  scale = Math.max(scale / 1.3, 0.3);
+  applyTransform();
+});
+document.getElementById('btnZoomReset').addEventListener('click', resetZoom);
+
+// Zoom con rueda del mouse
+zoomContainer.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+  scale = Math.min(Math.max(scale * delta, 0.3), 6);
+  applyTransform();
+}, { passive: false });
+
+// Arrastre con mouse
+zoomContainer.addEventListener('mousedown', e => {
+  if (e.button !== 0) return;
+  dragging = true;
+  startX = e.clientX - tx;
+  startY = e.clientY - ty;
+  zoomContainer.style.cursor = 'grabbing';
+});
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  tx = e.clientX - startX;
+  ty = e.clientY - startY;
+  applyTransform();
+});
+document.addEventListener('mouseup', () => {
+  dragging = false;
+  zoomContainer.style.cursor = 'grab';
+});
+
+// Checkbox maestro por grupo
+document.querySelectorAll('.chk-all-grupo').forEach(chk => {
+  chk.addEventListener('change', () => {
+    const g = chk.dataset.grupo;
+    document.querySelectorAll(`#tablaPreview_${g} .chk-incluir`).forEach(c => {
+      c.checked = chk.checked;
+    });
+  });
+});
+
+// Seleccionar / deseleccionar todos los grupos
+function setAll(checked) {
+  document.querySelectorAll('.chk-incluir, .chk-all-grupo').forEach(c => c.checked = checked);
+}
+document.getElementById('btnSelAll')?.addEventListener('click', () => setAll(true));
+document.getElementById('btnDeselAll')?.addEventListener('click', () => setAll(false));
+
+// Deshabilitar botón al enviar
+document.getElementById('formConfirmar')?.addEventListener('submit', () => {
+  const btn = document.getElementById('btnConfirmar');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando…';
+});
+</script>
+{% endblock %}

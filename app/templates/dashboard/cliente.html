@@ -1,0 +1,947 @@
+{% extends "base.html" %}
+{% block title %}{{ cliente.nombre }} — Dashboard{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">{{ cliente.nombre }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="mb-0">
+    <i class="bi bi-building me-2 text-primary"></i>{{ cliente.nombre }}
+  </h2>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('dashboard.exportar_excel', cliente_id=cliente.id) }}"
+       class="btn btn-outline-success btn-sm">
+      <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+    </a>
+    <a href="{{ url_for('importacion.index') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-folder-plus me-1"></i>Importar documentos
+    </a>
+  </div>
+</div>
+
+{% if carga_global %}
+<div class="card mb-4 shadow-sm">
+  <div class="card-body py-2">
+    <p class="text-muted small mb-2"><i class="bi bi-people me-1"></i>Carga pendiente por revisor:</p>
+    <div class="d-flex flex-wrap gap-2">
+      {% for iniciales, info in carga_global.items() %}
+        <span class="badge rounded-pill {% if info.total > 0 %}bg-primary{% else %}bg-secondary{% endif %} px-3 py-2 badge-carga-persona"
+              data-iniciales="{{ iniciales }}"
+              data-nombre="{{ info.nombre }}"
+              data-total="{{ info.total }}">
+          {{ iniciales }} — {{ info.nombre }}: {{ info.total }}
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if not proyectos_data %}
+  <div class="alert alert-info">
+    No hay proyectos para este cliente.
+    <a href="{{ url_for('config.proyecto_nuevo') }}">Crear uno</a>.
+  </div>
+{% endif %}
+
+{% for pd in proyectos_data %}
+{% set proyecto = pd.proyecto %}
+<div class="card mb-4 shadow-sm">
+  <div class="card-header bg-light d-flex justify-content-between align-items-center">
+    <div>
+      <span class="fw-bold fs-5 font-monospace">{{ proyecto.codigo }}</span>
+      <span class="text-muted ms-2 small">{{ proyecto.nombre }}</span>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+      <span class="badge-pendientes badge {% if pd.pendientes > 0 %}bg-warning text-dark{% else %}bg-success{% endif %}"
+            data-proyecto="{{ proyecto.id }}">
+        {% if pd.pendientes > 0 %}{{ pd.pendientes }} pendiente(s){% else %}Al día{% endif %}
+      </span>
+      <button class="btn btn-outline-secondary btn-sm btn-toggle-dms-view"
+              data-proyecto="{{ proyecto.id }}" title="Mostrar/ocultar documentos cargados al DMS">
+        <i class="bi bi-eye-slash me-1"></i>Cargados al DMS
+      </button>
+      {% set pendientes_correo = pd.documentos | selectattr('ruta_servidor') | rejectattr('correo_enviado') | rejectattr('correo_borrador') | rejectattr('cargado_dms') | list | length %}
+      <button class="btn btn-outline-primary btn-sm btn-generar-correos"
+              data-proyecto-id="{{ proyecto.id }}"
+              title="Generar borradores de correo en Outlook">
+        <i class="bi bi-envelope-plus me-1"></i>Correos
+        {% if pendientes_correo > 0 %}
+          <span class="badge bg-primary ms-1">{{ pendientes_correo }}</span>
+        {% endif %}
+      </button>
+      <a href="{{ url_for('config.proyecto_editar', proyecto_id=proyecto.id) }}"
+         class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-gear"></i>
+      </a>
+    </div>
+  </div>
+
+  {# Tabla de documentos #}
+  <div class="card-body p-0">
+    {% if pd.documentos %}
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle" id="tabla-{{ proyecto.id }}"
+             style="table-layout:fixed; width:100%">
+        <colgroup>
+          <col style="width:22px">        {# círculo #}
+          <col style="width:130px">       {# código #}
+          <col style="width:40px">        {# rev #}
+          <col style="width:100px">       {# provisión #}
+          <col>                           {# título — flexible #}
+          <col style="width:80px">        {# disciplina #}
+          <col style="width:110px">       {# tipo #}
+          <col style="width:65px">        {# asignado #}
+          <col style="width:90px">        {# llegada #}
+          <col style="width:150px">       {# devolución #}
+          <col style="width:150px">       {# revisión #}
+          <col style="width:40px">        {# dms #}
+          <col style="width:50px">        {# correo #}
+          <col style="width:90px">        {# servidor #}
+          <col style="width:80px">        {# acciones #}
+          <col style="width:42px">        {# comentarios #}
+        </colgroup>
+        <thead class="table-light" style="position:sticky; top:0; z-index:2;">
+          <tr>
+            <th style="background:#f8f9fa; width:20px"></th>
+            <th style="background:#f8f9fa">Código</th>
+            <th style="background:#f8f9fa">Rev.</th>
+            <th style="background:#f8f9fa">Provisión</th>
+            <th style="background:#f8f9fa">Título</th>
+            <th style="background:#f8f9fa">Disciplina</th>
+            <th style="background:#f8f9fa">Tipo</th>
+            <th style="background:#f8f9fa">Asignado</th>
+            <th style="background:#f8f9fa">Llegada</th>
+            <th style="background:#f8f9fa">Devolución</th>
+            <th style="background:#f8f9fa">Revisión</th>
+            <th style="background:#f8f9fa">DMS</th>
+            <th style="background:#f8f9fa">Correo</th>
+            <th style="background:#f8f9fa">Servidor</th>
+            <th style="background:#f8f9fa"></th>
+            <th style="background:#f8f9fa; text-align:center" title="Comentarios"><i class="bi bi-chat-text"></i></th>
+          </tr>
+          {# Fila de filtros #}
+          <tr class="fila-filtros" data-tabla="tabla-{{ proyecto.id }}">
+            <th></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th><input type="text" class="form-control form-control-sm filtro-col" placeholder="…"></th>
+            <th style="min-width:140px">
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control form-control-sm filtro-rango-fecha"
+                       data-campo-fecha="fechaLlegada" placeholder="Rango…" readonly style="cursor:pointer">
+                <button class="btn btn-outline-secondary btn-limpiar-fecha" type="button" tabindex="-1">✕</button>
+              </div>
+            </th>
+            <th style="min-width:140px">
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control form-control-sm filtro-rango-fecha"
+                       data-campo-fecha="fechaDevolucion" placeholder="Rango…" readonly style="cursor:pointer">
+                <button class="btn btn-outline-secondary btn-limpiar-fecha" type="button" tabindex="-1">✕</button>
+              </div>
+            </th>
+            <th style="min-width:140px">
+              <div class="input-group input-group-sm">
+                <input type="text" class="form-control form-control-sm filtro-rango-fecha"
+                       data-campo-fecha="fechaRevision" placeholder="Rango…" readonly style="cursor:pointer">
+                <button class="btn btn-outline-secondary btn-limpiar-fecha" type="button" tabindex="-1">✕</button>
+              </div>
+            </th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for doc in pd.documentos %}
+          <tr class="{% if doc.cargado_dms %}fila-dms d-none{% endif %}"
+              data-doc-id="{{ doc.id }}"
+              data-proyecto-id="{{ proyecto.id }}"
+              data-codigo="{{ doc.codigo }}"
+              data-revision="{{ doc.revision }}"
+              data-provision="{{ doc.provision }}"
+              data-titulo="{{ doc.titulo }}"
+              data-disciplina="{{ doc.disciplina }}"
+              data-tipo="{{ doc.tipo_documento }}"
+              data-asignado="{{ doc.asignado_a }}"
+              data-fecha-llegada="{{ doc.fecha_llegada }}"
+              data-fecha-devolucion="{{ doc.fecha_devolucion }}"
+              data-dias-habiles="{{ dias_habiles_hasta(doc.fecha_devolucion) if doc.fecha_devolucion else '' }}"
+              data-fecha-revision="{{ doc.fecha_revision }}"
+              data-comentarios="{{ doc.comentarios }}">
+            <td class="p-0 text-center align-middle td-estado-circle">
+              {% set dias_h = dias_habiles_hasta(doc.fecha_devolucion) if doc.fecha_devolucion else none %}
+              <span class="estado-circle" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:{% if doc.cargado_dms %}#16a34a{% elif dias_h is not none and dias_h < 0 %}#ef4444{% else %}#eab308{% endif %}"></span>
+            </td>
+            <td class="fw-mono small">{{ doc.codigo }}</td>
+            <td>{{ doc.revision }}</td>
+            <td>{{ doc.provision }}</td>
+            <td>{{ doc.titulo }}</td>
+            <td><span class="badge bg-secondary">{{ doc.disciplina }}</span></td>
+            <td class="small">{{ doc.tipo_documento }}</td>
+            <td><span class="badge {% if doc.asignado_a %}bg-primary{% else %}bg-light text-muted{% endif %}">{{ doc.asignado_a or '—' }}</span></td>
+            <td class="small">{{ doc.fecha_llegada }}</td>
+            <td class="small td-fecha-devolucion">
+              {{ doc.fecha_devolucion or '—' }}
+            </td>
+            {# Fecha revisión: click para editar inline #}
+            <td class="small td-fecha-revision"
+                data-doc-id="{{ doc.id }}"
+                data-valor="{{ doc.fecha_revision or '' }}"
+                style="cursor:pointer; min-width:100px"
+                title="Click para editar">
+              {{ doc.fecha_revision or '—' }}
+            </td>
+            {# Toggle DMS #}
+            <td class="text-center">
+              <button class="btn btn-link btn-sm p-0 btn-toggle-dms"
+                      data-doc-id="{{ doc.id }}"
+                      title="Click para cambiar estado DMS">
+                {% if doc.cargado_dms %}
+                  <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                {% else %}
+                  <i class="bi bi-circle text-muted fs-5"></i>
+                {% endif %}
+              </button>
+            </td>
+            <td class="text-center">
+              <button class="btn btn-link btn-sm p-0 btn-toggle-correo"
+                      data-doc-id="{{ doc.id }}"
+                      data-estado="{% if doc.correo_enviado %}verde{% elif doc.correo_borrador %}naranja{% else %}gris{% endif %}"
+                      title="{% if doc.correo_enviado %}Enviado — clic para resetear{% elif doc.correo_borrador %}Borrador generado — clic para confirmar envío{% else %}Sin borrador{% endif %}">
+                {% if doc.correo_enviado %}
+                  <i class="bi bi-envelope-check-fill text-success fs-5"></i>
+                {% elif doc.correo_borrador %}
+                  <i class="bi bi-envelope-arrow-up text-warning fs-5"></i>
+                {% else %}
+                  <i class="bi bi-envelope text-muted fs-5"></i>
+                {% endif %}
+              </button>
+            </td>
+            {# Servidor #}
+            <td class="small celda-servidor">
+              {% if doc.ruta_servidor %}
+                <span class="text-success" title="{{ doc.ruta_servidor }}">
+                  <i class="bi bi-folder-check me-1"></i>
+                  <span class="text-muted" style="font-size:0.75em">{{ doc.ruta_servidor.split('\\')[-1] }}</span>
+                </span>
+                <button class="btn btn-link btn-sm p-0 ms-1 btn-copiar-ruta"
+                        data-ruta="{{ doc.ruta_servidor }}"
+                        title="Copiar ruta al portapapeles">
+                  <i class="bi bi-clipboard text-secondary" style="font-size:0.85em"></i>
+                </button>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            {# Acciones #}
+            <td class="text-center text-nowrap">
+              {% if doc.disciplina != 'Interdisciplinaria' and not doc.ruta_servidor %}
+                <button class="btn btn-link btn-sm p-0 me-1 btn-mover-servidor"
+                        data-doc-id="{{ doc.id }}"
+                        title="Mover al servidor">
+                  <i class="bi bi-cloud-upload text-primary"></i>
+                </button>
+              {% elif doc.ruta_servidor %}
+                <button class="btn btn-link btn-sm p-0 me-1 btn-reset-servidor"
+                        data-doc-id="{{ doc.id }}"
+                        title="Reiniciar subida al servidor">
+                  <i class="bi bi-arrow-counterclockwise text-warning"></i>
+                </button>
+              {% else %}
+                <span class="me-1" style="display:inline-block;width:1.25rem"></span>
+              {% endif %}
+              <button class="btn btn-link btn-sm p-0 me-1 btn-editar-doc"
+                      data-doc-id="{{ doc.id }}"
+                      data-provision-unica="{{ '1' if proyecto.provision_unica else '0' }}"
+                      data-provisiones='{{ proyecto.provisiones_disponibles | tojson }}'
+                      data-equipo="{{ usuarios | map(attribute='iniciales') | join(',') }}"
+                      title="Editar">
+                <i class="bi bi-pencil text-secondary"></i>
+              </button>
+              <button class="btn btn-link btn-sm p-0 btn-eliminar-doc"
+                      data-doc-id="{{ doc.id }}"
+                      data-codigo="{{ doc.codigo }}"
+                      title="Eliminar">
+                <i class="bi bi-trash text-danger"></i>
+              </button>
+            </td>
+            <td class="text-center">
+              {% if doc.comentarios %}
+                <button class="btn btn-link btn-sm p-0 btn-ver-comentario"
+                        data-comentario="{{ doc.comentarios }}"
+                        title="Ver comentario">
+                  <i class="bi bi-chat-text-fill text-secondary"></i>
+                </button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-muted p-3 mb-0">Sin documentos registrados.</p>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+{# ── Modal de edición de documento ── #}
+<div class="modal fade" id="modalEditarDoc" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-pencil me-2"></i>Editar documento</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editDocId">
+        <div class="row g-3">
+          <div class="col-md-5">
+            <label class="form-label small fw-semibold">Título</label>
+            <input type="text" id="editTitulo" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Código</label>
+            <input type="text" id="editCodigo" class="form-control form-control-sm font-monospace">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold">Revisión</label>
+            <input type="text" id="editRevision" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-2" id="editDivProvision">
+            <label class="form-label small fw-semibold">Provisión</label>
+            <input type="text" id="editProvision" class="form-control form-control-sm">
+            <select id="editProvisionSelect" class="form-select form-select-sm d-none"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Disciplina</label>
+            <select id="editDisciplina" class="form-select form-select-sm">
+              <option value="">—</option>
+              {% for d in disciplinas %}
+                <option value="{{ d }}">{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Tipo de documento</label>
+            <select id="editTipo" class="form-select form-select-sm">
+              <option value="">—</option>
+              {% for t in tipos_documento %}
+                <option value="{{ t }}">{{ t }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Asignado a</label>
+            <select id="editAsignado" class="form-select form-select-sm font-monospace">
+              <option value="">— Sin asignar —</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Fecha llegada</label>
+            <input type="date" id="editFechaLlegada" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Fecha devolución</label>
+            <input type="date" id="editFechaDevolucion" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Fecha revisión</label>
+            <input type="date" id="editFechaRevision" class="form-control form-control-sm">
+          </div>
+          <div class="col-12">
+            <label class="form-label small fw-semibold">Comentarios</label>
+            <input type="text" id="editComentarios" class="form-control form-control-sm">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnGuardarEdit">
+          <i class="bi bi-check-lg me-1"></i>Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Modal de confirmación de eliminación ── #}
+<div class="modal fade" id="modalEliminar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title text-danger"><i class="bi bi-trash me-2"></i>Eliminar documento</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>¿Eliminár el documento <strong id="eliminarCodigo"></strong>?</p>
+        <p class="text-muted small">Esta acción no se puede deshacer.</p>
+        <input type="hidden" id="eliminarDocId">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger btn-sm" id="btnConfirmarEliminar">
+          <i class="bi bi-trash me-1"></i>Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Modal para ver comentario (texto seleccionable/copiable) #}
+<div class="modal fade" id="modalVerComentario" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:420px">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title"><i class="bi bi-chat-text me-2"></i>Comentario</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="modalComentarioTexto" class="mb-0" style="white-space:pre-wrap; user-select:text"></p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+  tr.fila-dms td { background-color: #f0fdf4 !important; }
+  tr.fila-dms:hover td { background-color: #dcfce7 !important; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/es.js"></script>
+<script>
+// ── Filtros por columna ──────────────────────────────────────
+document.querySelectorAll('.fila-filtros').forEach(filaFiltros => {
+  const tablaId = filaFiltros.dataset.tabla;
+  const tbody = document.querySelector(`#${tablaId} tbody`);
+  const filasTh = filaFiltros.querySelectorAll('th');
+
+  function getRangoFecha(inp) {
+    const dates = inp?._flatpickr?.selectedDates || [];
+    if (dates.length === 2) return [dates[0].toISOString().slice(0, 10), dates[1].toISOString().slice(0, 10)];
+    if (dates.length === 1) { const d = dates[0].toISOString().slice(0, 10); return [d, d]; }
+    return ['', ''];
+  }
+
+  function aplicarFiltros() {
+    tbody.querySelectorAll('tr').forEach(tr => {
+      let visible = true;
+
+      // Filtros de texto por columna
+      filasTh.forEach((th, thIdx) => {
+        const filtro = th.querySelector('.filtro-col')?.value.trim().toLowerCase() || '';
+        if (!filtro) return;
+        const celda = tr.cells[thIdx];
+        if (celda && !celda.textContent.trim().toLowerCase().includes(filtro)) {
+          visible = false;
+        }
+      });
+
+      // Filtros de rango de fechas
+      filaFiltros.querySelectorAll('.filtro-rango-fecha').forEach(inp => {
+        if (!visible) return;
+        const campo = inp.dataset.campoFecha;
+        const [desde, hasta] = getRangoFecha(inp);
+        if (!desde && !hasta) return;
+        const fecha = tr.dataset[campo] || '';
+        if (desde && fecha < desde) visible = false;
+        if (hasta && fecha > hasta) visible = false;
+      });
+
+      tr.style.display = visible ? '' : 'none';
+    });
+  }
+
+  filaFiltros.querySelectorAll('.filtro-col').forEach(inp => {
+    inp.addEventListener('input', aplicarFiltros);
+  });
+
+  // Inicializar Flatpickr en todos los inputs de rango de fecha
+  filaFiltros.querySelectorAll('.filtro-rango-fecha').forEach(rangoInput => {
+    flatpickr(rangoInput, {
+      mode: 'range',
+      dateFormat: 'd/m/Y',
+      locale: 'es',
+      allowInput: false,
+      onClose: aplicarFiltros,
+      onReady(_, __, fp) {
+        const clearBtn = rangoInput.closest('.input-group')?.querySelector('.btn-limpiar-fecha');
+        if (clearBtn) clearBtn.addEventListener('click', () => { fp.clear(); aplicarFiltros(); });
+      }
+    });
+  });
+});
+
+// ── Toggle DMS ──────────────────────────────────────────────
+document.querySelectorAll('.btn-toggle-dms').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const docId = btn.dataset.docId;
+    const res = await fetch(`/dashboard/documento/${docId}/toggle-dms`, { method: 'POST' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const icon = btn.querySelector('i');
+    const tr = btn.closest('tr');
+    const tabla = tr.closest('table');
+    const proyectoId = tabla?.id?.replace('tabla-', '');
+    const mostrandoDMS = proyectoId && document.querySelector(`.btn-toggle-dms-view[data-proyecto="${proyectoId}"]`)?.dataset.mostrandoDms === '1';
+
+    const circle = tr.querySelector('.estado-circle');
+    const tdDevolucion = tr.querySelector('.td-fecha-devolucion');
+    if (data.cargado_dms) {
+      icon.className = 'bi bi-check-circle-fill text-success fs-5';
+      tr.classList.add('fila-dms');
+      if (!mostrandoDMS) tr.classList.add('d-none');
+      if (circle) circle.style.background = '#16a34a';
+      if (tdDevolucion) tdDevolucion.style.background = '';
+    } else {
+      icon.className = 'bi bi-circle text-muted fs-5';
+      tr.classList.remove('fila-dms', 'd-none');
+      if (circle) {
+        const dias = parseInt(tr.dataset.diasHabiles);
+        circle.style.background = (!isNaN(dias) && dias < 0) ? '#ef4444' : '#eab308';
+      }
+      if (tdDevolucion) {
+        const dias = parseInt(tr.dataset.diasHabiles);
+        if (!isNaN(dias)) {
+          tdDevolucion.style.background = dias < 0 ? '#fecaca' : dias <= 1 ? '#ffedd5' : dias <= 3 ? '#fef9c3' : '#dcfce7';
+        }
+      }
+    }
+
+    // Actualizar badge de pendientes del proyecto
+    const pidBadge = tr.dataset.proyectoId;
+    if (pidBadge) {
+      const badge = document.querySelector(`.badge-pendientes[data-proyecto="${pidBadge}"]`);
+      if (badge) {
+        const pendientes = document.querySelectorAll(
+          `tr[data-proyecto-id="${pidBadge}"]:not(.fila-dms)`
+        ).length;
+        if (pendientes > 0) {
+          badge.className = 'badge-pendientes badge bg-warning text-dark';
+          badge.textContent = `${pendientes} pendiente(s)`;
+        } else {
+          badge.className = 'badge-pendientes badge bg-success';
+          badge.textContent = 'Al día';
+        }
+      }
+    }
+
+    // Actualizar badge del botón Correos
+    if (pidBadge) {
+      const correosBtn = document.querySelector(`.btn-generar-correos[data-proyecto-id="${pidBadge}"]`);
+      if (correosBtn) {
+        const correosPendientes = [...document.querySelectorAll(
+          `#tabla-${pidBadge} tbody tr[data-proyecto-id="${pidBadge}"]`
+        )].filter(fila =>
+          !fila.classList.contains('fila-dms') &&
+          fila.querySelector('.btn-copiar-ruta') &&
+          fila.querySelector('.btn-toggle-correo[data-estado="gris"]')
+        ).length;
+        let badgeCorreo = correosBtn.querySelector('.badge');
+        if (correosPendientes > 0) {
+          if (!badgeCorreo) {
+            badgeCorreo = document.createElement('span');
+            badgeCorreo.className = 'badge bg-primary ms-1';
+            correosBtn.appendChild(badgeCorreo);
+          }
+          badgeCorreo.textContent = correosPendientes;
+        } else {
+          badgeCorreo?.remove();
+        }
+      }
+    }
+
+    // Actualizar badge de carga por persona
+    const asignado = tr.dataset.asignado;
+    if (asignado) {
+      const cargaBadge = document.querySelector(`.badge-carga-persona[data-iniciales="${asignado}"]`);
+      if (cargaBadge) {
+        const totalPersona = document.querySelectorAll(
+          `tr[data-asignado="${asignado}"]:not(.fila-dms)`
+        ).length;
+        cargaBadge.dataset.total = totalPersona;
+        const nombre = cargaBadge.dataset.nombre;
+        cargaBadge.className = `badge rounded-pill ${totalPersona > 0 ? 'bg-primary' : 'bg-secondary'} px-3 py-2 badge-carga-persona`;
+        cargaBadge.textContent = `${asignado} — ${nombre}: ${totalPersona}`;
+      }
+    }
+  });
+});
+
+// ── Fecha revisión: edición inline ──────────────────────────
+document.querySelectorAll('.td-fecha-revision').forEach(td => {
+  td.addEventListener('click', () => {
+    if (td.querySelector('input')) return; // ya editando
+    const docId = td.dataset.docId;
+    const valorActual = td.dataset.valor;
+    const textoAnterior = td.textContent.trim();
+    td.innerHTML = `<input type="date" class="form-control form-control-sm" value="${valorActual}" style="min-width:130px">`;
+    const inp = td.querySelector('input');
+    inp.focus();
+
+    async function guardar() {
+      const nuevaFecha = inp.value;
+      const fd = new FormData();
+      fd.append('fecha_revision', nuevaFecha);
+      const res = await fetch(`/dashboard/documento/${docId}/editar`, { method: 'POST', body: fd });
+      if (res.ok) {
+        td.dataset.valor = nuevaFecha;
+        td.textContent = nuevaFecha || '—';
+        td.closest('tr').dataset.fechaRevision = nuevaFecha;
+      } else {
+        td.textContent = textoAnterior;
+      }
+    }
+    inp.addEventListener('blur', guardar);
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') inp.blur(); });
+  });
+});
+
+// ── Mostrar/ocultar filas cargadas al DMS por proyecto ──────
+document.querySelectorAll('.btn-toggle-dms-view').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const proyectoId = btn.dataset.proyecto;
+    const mostrando = btn.dataset.mostrandoDms === '1';
+    const filas = document.querySelectorAll(`#tabla-${proyectoId} .fila-dms`);
+    const icon = btn.querySelector('i');
+
+    if (mostrando) {
+      filas.forEach(tr => tr.classList.add('d-none'));
+      icon.className = 'bi bi-eye-slash me-1';
+      btn.dataset.mostrandoDms = '0';
+    } else {
+      filas.forEach(tr => tr.classList.remove('d-none'));
+      icon.className = 'bi bi-eye me-1';
+      btn.dataset.mostrandoDms = '1';
+    }
+  });
+  btn.dataset.mostrandoDms = '0';
+});
+
+// ── Modal de edición ────────────────────────────────────────
+const modalEditarEl = document.getElementById('modalEditarDoc');
+const modalEditar = new bootstrap.Modal(modalEditarEl);
+
+document.querySelectorAll('.btn-editar-doc').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tr = btn.closest('tr');
+    document.getElementById('editDocId').value = btn.dataset.docId;
+    document.getElementById('editCodigo').value = tr.dataset.codigo;
+    document.getElementById('editRevision').value = tr.dataset.revision;
+    document.getElementById('editTitulo').value = tr.dataset.titulo;
+    document.getElementById('editDisciplina').value = tr.dataset.disciplina;
+    document.getElementById('editTipo').value = tr.dataset.tipo;
+    // Poblar dropdown de equipo
+    const equipo = btn.dataset.equipo ? btn.dataset.equipo.split(',') : [];
+    const selAsignado = document.getElementById('editAsignado');
+    selAsignado.innerHTML = '<option value="">— Sin asignar —</option>';
+    equipo.forEach(ini => {
+      const opt = document.createElement('option');
+      opt.value = ini;
+      opt.textContent = ini;
+      selAsignado.appendChild(opt);
+    });
+    selAsignado.value = tr.dataset.asignado;
+    document.getElementById('editFechaLlegada').value = tr.dataset.fechaLlegada;
+    document.getElementById('editFechaDevolucion').value = tr.dataset.fechaDevolucion;
+    document.getElementById('editFechaRevision').value = tr.dataset.fechaRevision;
+    document.getElementById('editComentarios').value = tr.dataset.comentarios;
+
+    // Mostrar/ocultar provisión según el proyecto
+    const inputProv = document.getElementById('editProvision');
+    const selectProv = document.getElementById('editProvisionSelect');
+    if (btn.dataset.provisionUnica === '1') {
+      document.getElementById('editDivProvision').style.display = 'none';
+    } else {
+      document.getElementById('editDivProvision').style.display = '';
+      const provisiones = btn.dataset.provisiones ? JSON.parse(btn.dataset.provisiones) : [];
+      if (provisiones.length > 0) {
+        selectProv.innerHTML = '<option value="">—</option>';
+        provisiones.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p;
+          selectProv.appendChild(opt);
+        });
+        selectProv.value = tr.dataset.provision;
+        inputProv.classList.add('d-none');
+        selectProv.classList.remove('d-none');
+      } else {
+        inputProv.value = tr.dataset.provision;
+        inputProv.classList.remove('d-none');
+        selectProv.classList.add('d-none');
+      }
+    }
+
+    modalEditar.show();
+  });
+});
+
+document.getElementById('btnGuardarEdit').addEventListener('click', async () => {
+  const docId = document.getElementById('editDocId').value;
+  const fd = new FormData();
+  fd.append('codigo', document.getElementById('editCodigo').value);
+  fd.append('revision', document.getElementById('editRevision').value);
+  const _selectProv = document.getElementById('editProvisionSelect');
+  fd.append('provision', _selectProv.classList.contains('d-none')
+    ? document.getElementById('editProvision').value
+    : _selectProv.value);
+  fd.append('titulo', document.getElementById('editTitulo').value);
+  fd.append('disciplina', document.getElementById('editDisciplina').value);
+  fd.append('tipo_documento', document.getElementById('editTipo').value);
+  fd.append('asignado_a', document.getElementById('editAsignado').value);
+  fd.append('fecha_llegada', document.getElementById('editFechaLlegada').value);
+  fd.append('fecha_devolucion', document.getElementById('editFechaDevolucion').value);
+  fd.append('fecha_revision', document.getElementById('editFechaRevision').value);
+  fd.append('comentarios', document.getElementById('editComentarios').value);
+
+  const res = await fetch(`/dashboard/documento/${docId}/editar`, { method: 'POST', body: fd });
+  if (res.ok) {
+    modalEditar.hide();
+    location.reload();
+  }
+});
+
+// ── Modal de eliminación ────────────────────────────────────
+const modalEliminarEl = document.getElementById('modalEliminar');
+const modalEliminar = new bootstrap.Modal(modalEliminarEl);
+
+document.querySelectorAll('.btn-eliminar-doc').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('eliminarDocId').value = btn.dataset.docId;
+    document.getElementById('eliminarCodigo').textContent = btn.dataset.codigo;
+    modalEliminar.show();
+  });
+});
+
+document.getElementById('btnConfirmarEliminar').addEventListener('click', async () => {
+  const docId = document.getElementById('eliminarDocId').value;
+  const tr = document.querySelector(`tr[data-doc-id="${docId}"]`);
+  const proyectoId = tr?.dataset.proyectoId;
+  const asignado = tr?.dataset.asignado;
+  const isPending = tr && !tr.classList.contains('fila-dms');
+
+  const res = await fetch(`/dashboard/documento/${docId}/eliminar`, { method: 'POST' });
+  if (res.ok) {
+    modalEliminar.hide();
+    tr?.remove();
+
+    // Actualizar badge de pendientes del proyecto
+    if (proyectoId) {
+      const badge = document.querySelector(`.badge-pendientes[data-proyecto="${proyectoId}"]`);
+      if (badge) {
+        const pendientes = document.querySelectorAll(
+          `tr[data-proyecto-id="${proyectoId}"]:not(.fila-dms)`
+        ).length;
+        if (pendientes > 0) {
+          badge.className = 'badge bg-warning text-dark';
+          badge.textContent = `${pendientes} pendiente(s)`;
+        } else {
+          badge.className = 'badge bg-success';
+          badge.textContent = 'Al día';
+        }
+      }
+    }
+
+    // Actualizar badge de carga por persona (solo si el doc era pendiente)
+    if (isPending && asignado) {
+      const cargaBadge = document.querySelector(`.badge-carga-persona[data-iniciales="${asignado}"]`);
+      if (cargaBadge) {
+        const total = Math.max(0, parseInt(cargaBadge.dataset.total || '0') - 1);
+        cargaBadge.dataset.total = total;
+        const nombre = cargaBadge.dataset.nombre;
+        cargaBadge.className = `badge rounded-pill ${total > 0 ? 'bg-primary' : 'bg-secondary'} px-3 py-2 badge-carga-persona`;
+        cargaBadge.textContent = `${asignado} — ${nombre}: ${total}`;
+      }
+    }
+  }
+});
+
+// ── Copiar ruta al portapapeles ──────────────────────────────
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-copiar-ruta');
+  if (!btn) return;
+  const ruta = btn.dataset.ruta;
+  await navigator.clipboard.writeText(ruta);
+  const icon = btn.querySelector('i');
+  icon.className = 'bi bi-clipboard-check text-success';
+  setTimeout(() => { icon.className = 'bi bi-clipboard text-secondary'; }, 1500);
+});
+
+// ── Reset subida al servidor ─────────────────────────────────
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.btn-reset-servidor');
+  if (!btn) return;
+  if (!confirm('¿Reiniciar la subida al servidor? El archivo en el servidor no se eliminará, pero podrás volver a subirlo desde el dashboard.')) return;
+  const docId = btn.dataset.docId;
+  const res = await fetch(`/dashboard/documento/${docId}/reset-servidor`, { method: 'POST' });
+  const data = await res.json();
+  if (data.ok) {
+    const tr = btn.closest('tr');
+    // Limpiar celda Servidor
+    tr.querySelector('.celda-servidor').innerHTML = '<span class="text-muted">—</span>';
+    // Reemplazar ícono reset con botón de subida
+    const upload = document.createElement('button');
+    upload.className = 'btn btn-link btn-sm p-0 me-1 btn-mover-servidor';
+    upload.dataset.docId = docId;
+    upload.title = 'Mover al servidor';
+    upload.innerHTML = '<i class="bi bi-cloud-upload text-primary"></i>';
+    btn.replaceWith(upload);
+    // Registrar el evento en el nuevo botón
+    upload.addEventListener('click', moverAlServidorHandler);
+  }
+});
+
+// ── Mover al servidor ────────────────────────────────────────
+// ── Toggle correo — máquina de tres estados ─────────────────
+document.querySelectorAll('.btn-toggle-correo').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const docId = btn.dataset.docId;
+    const estado = btn.dataset.estado;
+    const icono = btn.querySelector('i');
+
+    if (estado === 'gris') return; // sin acción, se genera desde el botón del proyecto
+
+    if (estado === 'naranja') {
+      if (!confirm('¿Confirmar que este correo fue enviado desde Outlook?')) return;
+      const res = await fetch(`/dashboard/documento/${docId}/confirmar-correo`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        icono.className = 'bi bi-envelope-check-fill text-success fs-5';
+        btn.dataset.estado = 'verde';
+        btn.title = 'Enviado — clic para resetear';
+      }
+      return;
+    }
+
+    if (estado === 'verde') {
+      if (!confirm('¿Resetear el estado de correo de este documento?')) return;
+      const res = await fetch(`/dashboard/documento/${docId}/reset-correo`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        icono.className = 'bi bi-envelope text-muted fs-5';
+        btn.dataset.estado = 'gris';
+        btn.title = 'Sin borrador';
+      }
+    }
+  });
+});
+
+// ── Generar correos ──────────────────────────────────────────
+document.querySelectorAll('.btn-generar-correos').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const proyectoId = btn.dataset.proyectoId;
+    const badgeOrig = btn.querySelector('.badge')?.outerHTML || '';
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando...';
+    try {
+      const res = await fetch(`/dashboard/proyecto/${proyectoId}/generar-correos`, { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        if (data.total === 0) {
+          alert('No hay documentos pendientes de correo en este proyecto.');
+        } else {
+          const resumen = data.borradores.map(b => `• ${b.persona} (${b.provision}): ${b.n_docs} doc(s)`).join('\n');
+          alert(`Se crearon ${data.total} borrador(es) en Outlook:\n\n${resumen}\n\nRevisalos y enviálos desde Outlook.`);
+          location.reload();
+        }
+      } else {
+        alert('Error al generar correos:\n\n' + data.error);
+      }
+    } catch (err) {
+      alert('Error inesperado: ' + err.message);
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<i class="bi bi-envelope-plus me-1"></i>Correos${badgeOrig}`;
+  });
+});
+
+async function moverAlServidorHandler() {
+  const btn = this;
+  const docId = btn.dataset.docId;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  try {
+    const res = await fetch(`/dashboard/documento/${docId}/mover-servidor`, { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      const tr = btn.closest('tr');
+      const celdaServidor = tr.querySelector('.celda-servidor');
+      const nombreFecha = data.ruta.split('\\').pop();
+      celdaServidor.innerHTML = `
+        <span class="text-success" title="${data.ruta}">
+          <i class="bi bi-folder-check me-1"></i>
+          <span class="text-muted" style="font-size:0.75em">${nombreFecha}</span>
+        </span>
+        <button class="btn btn-link btn-sm p-0 ms-1 btn-copiar-ruta" data-ruta="${data.ruta}" title="Copiar ruta al portapapeles">
+          <i class="bi bi-clipboard text-secondary" style="font-size:0.85em"></i>
+        </button>`;
+      // Reemplazar botón subida con reset
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'btn btn-link btn-sm p-0 me-1 btn-reset-servidor';
+      resetBtn.dataset.docId = docId;
+      resetBtn.title = 'Reiniciar subida al servidor';
+      resetBtn.innerHTML = '<i class="bi bi-arrow-counterclockwise text-warning"></i>';
+      btn.replaceWith(resetBtn);
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-cloud-upload text-primary"></i>';
+      alert('Error al mover al servidor:\n\n' + data.error);
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-cloud-upload text-primary"></i>';
+    alert('Error inesperado: ' + err.message);
+  }
+}
+
+document.querySelectorAll('.btn-mover-servidor').forEach(btn => {
+  btn.addEventListener('click', moverAlServidorHandler);
+});
+
+// Color gradient para fecha de devolución (días hábiles) — fondo de celda
+(function () {
+  document.querySelectorAll('tr[data-dias-habiles]').forEach(tr => {
+    const raw = tr.dataset.diasHabiles;
+    if (raw === '' || raw === undefined) return;
+    if (tr.classList.contains('fila-dms')) return;
+    const td = tr.querySelector('.td-fecha-devolucion');
+    if (!td) return;
+    const dias = parseInt(raw);
+    if (dias < 0) {
+      td.style.background = '#fecaca';   // rojo claro
+    } else if (dias <= 1) {
+      td.style.background = '#ffedd5';   // naranja claro
+    } else if (dias <= 3) {
+      td.style.background = '#fef9c3';   // amarillo claro
+    } else {
+      td.style.background = '#dcfce7';   // verde claro
+    }
+  });
+})();
+
+// ── Modal ver comentario ─────────────────────────────────────
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.btn-ver-comentario');
+  if (!btn) return;
+  document.getElementById('modalComentarioTexto').textContent = btn.dataset.comentario;
+  new bootstrap.Modal(document.getElementById('modalVerComentario')).show();
+});
+</script>
+{% endblock %}
