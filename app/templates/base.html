@@ -80,10 +80,12 @@
 <div class="container-fluid py-4">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
+      {% if category != 'invite_link' %}
       <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
       </div>
+      {% endif %}
     {% endfor %}
   {% endwith %}
 
