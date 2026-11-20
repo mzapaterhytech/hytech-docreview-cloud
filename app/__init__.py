@@ -37,11 +37,9 @@ def create_app():
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'hytech-docreview-cloud-dev-only')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     if database_url.startswith('postgresql://'):
+        from sqlalchemy.pool import NullPool
         app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-            'pool_size': 2,
-            'max_overflow': 2,
-            'pool_pre_ping': True,
-            'pool_recycle': 280,
+            'poolclass': NullPool,  # Neon+PgBouncer ya hace pooling; NullPool evita conexiones muertas
         }
     # Solo presente (y en '1') en el .env local del administrador, con VPN a T:\
     app.config['ENABLE_LOCAL_FILE_OPS'] = os.environ.get('ENABLE_LOCAL_FILE_OPS', '0') == '1'
