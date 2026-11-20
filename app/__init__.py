@@ -32,6 +32,12 @@ def create_app():
     # Forzar psycopg2 como driver (evita que SQLAlchemy busque psycopg v3)
     if database_url.startswith('postgresql://') and '+' not in database_url.split('://')[0]:
         database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
+    # channel_binding=require solo lo soporta psycopg3; quitarlo para psycopg2
+    if 'psycopg2' in database_url and 'channel_binding' in database_url:
+        import re
+        database_url = re.sub(r'[&?]channel_binding=[^&]*', '', database_url)
+        database_url = re.sub(r'\?&', '?', database_url)
+        database_url = database_url.rstrip('?')
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'hytech-docreview-cloud-dev-only')
