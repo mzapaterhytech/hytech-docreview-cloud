@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Crear contraseña — Hytech DocReview{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+    <div class="card shadow-sm mt-4">
+      <div class="card-body p-4">
+        <h5 class="card-title mb-1 text-center">
+          <i class="bi bi-file-earmark-check me-1"></i>Hytech DocReview
+        </h5>
+        <p class="text-center text-muted small mb-3">Hola, {{ usuario.nombre }}. Elegí tu contraseña para activar tu cuenta.</p>
+        <form method="post">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="mb-3">
+            <label class="form-label">Contraseña</label>
+            <input type="password" name="password" class="form-control" required autofocus minlength="8">
+            <div class="form-text">Mínimo 8 caracteres.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Repetir contraseña</label>
+            <input type="password" name="confirmar" class="form-control" required minlength="8">
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Activar cuenta</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -9,6 +9,25 @@
   </a>
 </div>
 
+{# Mostrar link de invitación si acaba de crearse un usuario #}
+{% with messages = get_flashed_messages(category_filter=['invite_link']) %}
+  {% if messages %}
+    <div class="alert alert-success d-flex align-items-center gap-2 mb-3" role="alert">
+      <i class="bi bi-link-45deg fs-5"></i>
+      <div class="flex-grow-1">
+        <strong>Link de invitación:</strong>
+        <input type="text" class="form-control form-control-sm font-monospace mt-1"
+               value="{{ messages[0] }}" id="inviteLinkInput" readonly
+               onclick="this.select()">
+      </div>
+      <button class="btn btn-sm btn-outline-success"
+              onclick="navigator.clipboard.writeText(document.getElementById('inviteLinkInput').value);this.textContent='¡Copiado!'">
+        Copiar
+      </button>
+    </div>
+  {% endif %}
+{% endwith %}
+
 {% if not usuarios %}
   <div class="alert alert-info">No hay usuarios todavía.</div>
 {% else %}
@@ -20,8 +39,8 @@
         <th>Nombre</th>
         <th>Email</th>
         <th style="width:110px">Rol</th>
-        <th style="width:90px">Activo</th>
-        <th style="width:80px"></th>
+        <th style="width:120px">Estado</th>
+        <th style="width:160px"></th>
       </tr>
     </thead>
     <tbody>
@@ -37,12 +56,22 @@
         </td>
         <td>
           {% if u.activo %}
-            <span class="badge bg-success">Sí</span>
+            <span class="badge bg-success">Activo</span>
+          {% elif u.invite_token %}
+            <span class="badge bg-warning text-dark">Invitación pendiente</span>
           {% else %}
-            <span class="badge bg-secondary">No</span>
+            <span class="badge bg-secondary">Inactivo</span>
           {% endif %}
         </td>
-        <td class="text-end">
+        <td class="text-end d-flex gap-1 justify-content-end">
+          {% if u.invite_token %}
+          <form method="POST" action="{{ url_for('usuarios.reenviar_invitacion', usuario_id=u.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="btn btn-outline-warning btn-sm" title="Generar nuevo link">
+              <i class="bi bi-envelope me-1"></i>Reenviar
+            </button>
+          </form>
+          {% endif %}
           <a href="{{ url_for('usuarios.editar', usuario_id=u.id) }}"
              class="btn btn-outline-primary btn-sm">
             <i class="bi bi-pencil me-1"></i>Editar

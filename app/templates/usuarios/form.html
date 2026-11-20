@@ -56,11 +56,14 @@
             <label class="form-label fw-semibold">
               {{ 'Nueva contraseña' if usuario else 'Contraseña' }}
             </label>
-            <input type="password" name="password" class="form-control"
-                   {% if not usuario %}required{% endif %}>
-            {% if usuario %}
-              <div class="form-text">Dejar vacío para no cambiarla.</div>
-            {% endif %}
+            <input type="password" name="password" class="form-control">
+            <div class="form-text">
+              {% if usuario %}
+                Dejar vacío para no cambiarla.
+              {% else %}
+                Dejar vacío para enviar un link de invitación (el usuario define su propia contraseña).
+              {% endif %}
+            </div>
           </div>
 
           <div class="form-check mb-4">

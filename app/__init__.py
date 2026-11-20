@@ -121,6 +121,8 @@ def create_app():
                 "ALTER TABLE proyecto ADD COLUMN estructura_servidor TEXT DEFAULT 'v1'",
                 "ALTER TABLE proyecto ADD COLUMN alcance_v2 TEXT DEFAULT ''",
                 "ALTER TABLE documento ADD COLUMN revisado_por TEXT DEFAULT ''",
+                "ALTER TABLE usuario ADD COLUMN invite_token TEXT DEFAULT NULL",
+                "ALTER TABLE usuario ADD COLUMN invite_expires TEXT DEFAULT NULL",
             ]:
                 try:
                     conn.execute(text(stmt))

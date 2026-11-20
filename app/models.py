@@ -143,6 +143,8 @@ class Usuario(UserMixin, db.Model):
     iniciales = db.Column(db.String(10), nullable=False, unique=True)
     rol = db.Column(db.String(20), nullable=False, default='revisor')
     activo = db.Column(db.Boolean, default=True)
+    invite_token = db.Column(db.String(64), nullable=True, unique=True)
+    invite_expires = db.Column(db.String(20), nullable=True)  # ISO datetime
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
