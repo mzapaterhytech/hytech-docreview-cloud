@@ -29,6 +29,9 @@ def create_app():
     # Render/Heroku-style URLs a veces vienen como postgres:// — SQLAlchemy 2.x requiere postgresql://
     if database_url.startswith('postgres://'):
         database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    # Forzar psycopg2 como driver (evita que SQLAlchemy busque psycopg v3)
+    if database_url.startswith('postgresql://') and '+' not in database_url.split('://')[0]:
+        database_url = database_url.replace('postgresql://', 'postgresql+psycopg2://', 1)
 
     app.config['SQLALCHEMY_DATABASE_URI'] = database_url
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'hytech-docreview-cloud-dev-only')
